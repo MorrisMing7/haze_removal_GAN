@@ -3,7 +3,7 @@ from haze_removal_net import *
 
 if __name__ == "__main__":
     train_dir ='/media/morris/文档/data/Beijing_img_X_cloudGAN6'
-    test_dir = '/media/morris/文档/data/Beijing_img_X_cloudGAN6/for_test'
+    test_dir = '/media/morris/文档/data/cut_by_hand_Test/result'
     for i in [train_dir,test_dir]:
         if not os.path.exists(i):
             raise Exception('train or test dir does not exist')
@@ -24,8 +24,7 @@ if __name__ == "__main__":
                            freq_summary=50,freq_trace=0,freq_display=500,
                            freq_process=100,freq_save=1000
                            )
-
-    gan.train()
+    # gan.train()
     print('train process is done, star to test')
     gan.have_trained=True
     gan.test(test_dir,result_dir)

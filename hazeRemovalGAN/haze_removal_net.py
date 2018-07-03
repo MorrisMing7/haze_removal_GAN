@@ -338,28 +338,22 @@ class haze_removal_net:
                     break
         self.have_trained = True
 
-
-
-
     def test(self, input_dir, result_dir):
         examples = self.load_ClearHaze_img(istesting=True)
         print("examples count = %d" % examples.count)
 
         model = self.create_model(examples.inputs, examples.targets)
         inputs = deprocess(examples.inputs)
-        targets = deprocess(examples.targets)
         outputs = deprocess(model.outputs)
 
         with tf.name_scope("fetches"):
             def convert(image):
                 return tf.image.convert_image_dtype(image, dtype=tf.uint8, saturate=True)
             converted_inputs = convert(inputs)
-            converted_targets = convert(targets)
             converted_outputs = convert(outputs)
             display_fetches = {
                 "paths":examples.paths,
                 "inputs": converted_inputs,
-                "targets": converted_targets,
                 "outputs": converted_outputs,
             }
 
@@ -390,22 +384,21 @@ class haze_removal_net:
 
         def save_images(fetches):
             h_ = self.im_size
-            w_ = h_*3
+            w_ = h_*2
             for i in range(0,self.batch_size):
-                result = np.ones([ h_,w_ + 10,3], dtype=np.uint8) * 255
-                _,result_name = os.path.split(str(fetches['paths'][i][0]))
+                result = np.ones([ h_,w_ + 5,3], dtype=np.uint8) * 255
+                _,result_name = os.path.split(str(fetches['paths'][i]))
+                result_name=result_dir+'/'+result_name
                 print result_name
-                s=raw_input()
-                result_name = result_dir + "/" + result_name
                 x=0
-                for kind in ['inputs','outputs','targets']:
+                for kind in ['inputs','outputs']:
                     tmp = np.array(fetches[kind][i], dtype=np.uint8)
                     result[ 0:,x:x+self.im_size,0:]=tmp
                     x=x+self.im_size+5
                 misc.imsave(result_name, result)
             return
 
-        saver = tf.train.Saver(max_to_keep=2)
+        saver = tf.train.Saver(max_to_keep=1)
         logdir = self.log_dir
         sv = tf.train.Supervisor(logdir=logdir, save_summaries_secs=0, saver=None)
         # start tf work
@@ -430,8 +423,16 @@ class haze_removal_net:
             inputs_dir =self.test_dir
         if not os.path.exists(inputs_dir):
             raise Exception("inputs_dir or targets_dir does not exist")
-        inputs_paths = glob.glob(os.path.join(inputs_dir, "*.png"))
-        decode = tf.image.decode_png
+        if istesting:
+            inputs_paths = glob.glob(os.path.join(inputs_dir, "*.jpg"))
+            if len(inputs_paths)<100:
+                raise Exception("something must be wrong")
+            decode = tf.image.decode_jpeg
+        else:
+            inputs_paths = glob.glob(os.path.join(inputs_dir, "*.png"))
+            if len(inputs_paths)<100:
+                raise Exception("something must be wrong")
+            decode = tf.image.decode_png
 
         # load images
         with tf.name_scope("load_images"):
@@ -443,21 +444,26 @@ class haze_removal_net:
             assertion = tf.assert_equal(tf.shape(raw_inputs)[2], 3, message="image does not have 3 channels")
             with tf.control_dependencies([assertion]):
                 raw_inputs = tf.identity(raw_inputs)
-
-            raw_inputs.set_shape([512, 1024, 3])
-            targets = preprocess(raw_inputs[:, :512, :])
-            inputs = preprocess(raw_inputs[:, 512:, :])
+            if istesting:
+                raw_inputs.set_shape([512,512,3])
+                inputs = preprocess(raw_inputs[:, :, :])
+                targets=inputs
+            else:
+                raw_inputs.set_shape([512, 1024, 3])
+                targets = preprocess(raw_inputs[:, :512, :])
+                inputs = preprocess(raw_inputs[:, 512:, :])
 
             inputs.set_shape([512, 512, 3])
             targets.set_shape([512, 512, 3])
-        in_paths, inputs_batch, targets_batch = tf.train.shuffle_batch(
-                [in_paths,inputs, targets],
-                batch_size=self.batch_size,
-                capacity=5000,min_after_dequeue=1000,
-                num_threads=1)
         if istesting:
             in_paths, inputs_batch, targets_batch = \
                 tf.train.batch([in_paths, inputs, targets],batch_size=self.batch_size)
+        else:
+            in_paths, inputs_batch, targets_batch = tf.train.shuffle_batch(
+                    [in_paths,inputs, targets],
+                    batch_size=self.batch_size,
+                    capacity=5000,min_after_dequeue=1000,
+                    num_threads=1)
         steps_per_epoch = int(math.ceil(len(inputs_paths) / self.batch_size))
 
         return Examples(
