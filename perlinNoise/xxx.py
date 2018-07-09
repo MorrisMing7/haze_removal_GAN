@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import random
 import numpy as np
 angryFireColorTable = np.array(
@@ -77,9 +78,8 @@ def GenerateWhiteNoise(height, width):
     return noise
 
 def GenerateSmoothNoise(baseNoise, octave):
-    height = len(baseNoise)
-    width = len(baseNoise[0])
-    smoothNoise =[ [0 for i in range(width)] for j in range(height)]
+    height, width = np.shape(baseNoise)
+    smoothNoise = np.zeros([height,width],dtype=np.float32)
 
     samplePeriod = 1 << octave
 
@@ -137,7 +137,7 @@ def GeneratePerlinNoise(baseNoise,octaveCount,persistance):
 
 def MapGray(perlinNoise):
     height,width = np.shape(perlinNoise)
-    image = [[0for j in range(width)]for i in range(height)]
+    image = np.zeros([height,width],np.float32)
     for i in range(height):
         for j in range(width):
             ta = 255
@@ -155,11 +155,15 @@ def MapGradient(perlinNoise):
             image[i][j][1] = angryFireColorTable[idx][1]
             image[i][j][2] = angryFireColorTable[idx][2]
     return image
+import matplotlib.pyplot as plt
 import scipy.misc
 if __name__=='__main__':
     print "hello"
     image=generateNoise(256,512)
-    scipy.misc.imshow(image)
+    plt.imshow(np.uint8(image))
+    plt.show()
+    scipy.misc.imsave('x.png',image)
+
 
 
 
